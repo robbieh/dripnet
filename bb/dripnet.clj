@@ -5,7 +5,7 @@
 (require '[babashka.process :as p :refer [process destroy-tree]])
 (require '[clojure.java.io :as io])
 (require '[clojure.string :refer [split]])
-(require '[clojure.core.async :as a])
+
 (def esc (char 27))
 (def home (char 13))
 (def cls (str esc "[2J"))
@@ -29,21 +29,16 @@
 (defn color256 [i]
   (str esc "[38;5;" i "m"))
 
-(declare COLS)
-(declare LINES)
 (if (empty? *command-line-args*)
-  (do (def COLS 80) (def LINES 24)) 
+  (do (def cols 80) (def lines 24)) 
   (let [[c l] (take 2 *command-line-args*)]
-    (def COLS (read-string c))
-    (def LINES (read-string l))))
-
-(defn cols [] COLS)
-(defn lines [] LINES)
+    (def cols (read-string c))
+    (def lines (read-string l))))
 
 (def dropmatrix (ref []))
 (def maxport 65535)
 (def lmax (Math/log maxport))
-(def scaling (/ (cols) lmax))
+(def scaling (/ cols lmax))
 
 ; tcpdump -------------------------------------------------------------------------
 (def tcpdump-matches (ref []))
@@ -56,7 +51,7 @@
     (when (= "Out" dir) (read-string destport))))
 
 (def tcpdump-stream 
-  (process {:err :inherit
+  (process {;:err :inherit
             :shutdown destroy-tree}
           "sudo tcpdump -l -qn -iany '((tcp[tcpflags] & tcp-syn) != 0 or (ip6 and (ip6[13 + 40] & 2) == 2))'" ))
 
@@ -88,7 +83,7 @@
   (vec (remove nil? 
             (for [drop drops]
               (let [y (:y drop)]
-                (if (< y (dec (lines)))
+                (if (< y (dec lines))
                   (assoc drop :y (inc y))))))))
 
 (defn move-and-add-drops! []
@@ -99,8 +94,8 @@
       (alter dropmatrix concat new))))
 
 (defn print-background []
-  (let [cols (cols)
-        lines (lines)
+  (let [cols cols
+        lines lines
         row (apply str (repeat cols "|"))]
     (print cls)
     ;(print green42)
@@ -115,19 +110,31 @@
   (doseq [{:keys [x y c p]} @dropmatrix]
     (println (str (pos x y) c))))
 
+(defn unprint-drops []
+  (doseq [{:keys [x y c p]} @dropmatrix]
+    (println (str (pos x y) " "))))
+
 (defn cycle []
     (move-and-add-drops!)
-    (print cls)
-    (print mtl)
+    (println cls) 
+    ;(println mtl)
     ;(print-background)
-    (print-drops))
+    ;(unprint-drops)
+    (print-drops)
+  )
 
 (defn dripnet []
-  (print cursor-off)
-  (print altmode-on)
+  (println cursor-off)
+  (println altmode-on)
+  (println cls)
+  (println mtl)
   (dotimes [i 600]
+    ;(cycle)
+    (unprint-drops)
     (print mtl)
-    (cycle)
+    ;(println (mapv bucket @tcpdump-matches) "            ")
+    (move-and-add-drops!)
+    (print-drops)
     (Thread/sleep 250)
     )
   (print altmode-off)
@@ -135,6 +142,6 @@
 
 (.addShutdownHook (Runtime/getRuntime) (Thread. (fn [] (println (str altmode-off cursor-on)))))
 
-(println (cols) (lines))
+(println cols lines)
 (dripnet)
 
