@@ -1,5 +1,4 @@
 #!/usr/bin/env bb
-;lsof -i -sTCP:ESTABLISHED -n -F n 
 ;ASNI codes: https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797
 
 (require '[babashka.process :as p :refer [process destroy-tree]])
@@ -62,7 +61,7 @@
               (loop []
                 (when-let [line (read-line)]
                   ;(swap! tcpdump-matches (comp vec #(remove nil? %) conj) (tcpdump-parse-line line))
-                  (dosync (alter tcpdump-matches (comp vec #(remove nil? %) conj) (tcpdump-parse-line line)))
+                  (locking tcpdump-matches (dosync (alter tcpdump-matches (comp vec #(remove nil? %) conj) (tcpdump-parse-line line))))
                   (recur)
                   ))))))
 
@@ -87,24 +86,11 @@
                   (assoc drop :y (inc y))))))))
 
 (defn move-and-add-drops! []
-  (dosync 
+  (locking tcpdump-matches (dosync 
     (let [new (ports-to-drops @tcpdump-matches)]
       (ref-set tcpdump-matches [])
       (alter dropmatrix move-drops)
-      (alter dropmatrix concat new))))
-
-(defn print-background []
-  (let [cols cols
-        lines lines
-        row (apply str (repeat cols "|"))]
-    (print cls)
-    ;(print green42)
-    (doseq [x (repeat lines 1)]
-      ;(doall (repeatedly lines (do (print row) (print "\r") (print "\n") (print (str esc "[#B")))))
-      ;(print row) (print "\r") (print "\n") (print (str esc "[#B"))
-      (println row) )
-    (print resetcolor)
-    ))
+      (alter dropmatrix concat new)))))
 
 (defn print-drops []
   (doseq [{:keys [x y c p]} @dropmatrix]
@@ -114,33 +100,23 @@
   (doseq [{:keys [x y c p]} @dropmatrix]
     (println (str (pos x y) " "))))
 
-(defn cycle []
-    (move-and-add-drops!)
-    (println cls) 
-    ;(println mtl)
-    ;(print-background)
-    ;(unprint-drops)
-    (print-drops)
-  )
-
 (defn dripnet []
   (println cursor-off)
   (println altmode-on)
   (println cls)
   (println mtl)
-  (dotimes [i 600]
-    ;(cycle)
+  (loop []
     (unprint-drops)
     (print mtl)
     ;(println (mapv bucket @tcpdump-matches) "            ")
     (move-and-add-drops!)
     (print-drops)
     (Thread/sleep 250)
-    )
+    (recur))
   (print altmode-off)
   (print cursor-on))
 
-(.addShutdownHook (Runtime/getRuntime) (Thread. (fn [] (println (str altmode-off cursor-on)))))
+(.addShutdownHook (Runtime/getRuntime) (Thread. (fn [] (println (str altmode-off cursor-on (pos 1 lines))))))
 
 (println cols lines)
 (dripnet)
