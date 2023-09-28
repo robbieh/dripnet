@@ -9,7 +9,6 @@
                       (Thread. (fn [] (fs/delete ".nrepl-port")))))
                   (deref (promise)))}}
  :paths ["bb"]
- :deps {babashka/clojure-lanterna {:mvn/version "0.9.8"}}
  }
 
 
