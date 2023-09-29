@@ -4,6 +4,8 @@ Dripnet
 
 A Babashka script to show outgoing connection ports as drops on the terminal.
 
+[raw/branch/dev/media/dripnet.png]("snapshot of dripnet running")
+
 Usage
 =====
 
